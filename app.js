@@ -1,21 +1,18 @@
+require("dotenv").config()
+const { connectDB } = require("./db/connect")
 const express = require("express")
-const { exercises } = require("./routes/exercises")
+const { router } = require("./routes/exercises")
+
 
 const app = express()
 const port = 5000
 
 // ROUTES
 
-// GET SEARCH FOR EXERCISES BASED ON 
-// /api/v1/exercises?type=hello&name=test
-app.use('/api/v1/exercises/', exercises)
+// /api/v1/exercises
+app.use('/api/v1/exercises/', router)
 
 
-// GET EXERCISE INFORMATIONS
-// /api/v1/exercises/exercise//id/:id
-
-// GET SEARCH FOR EXERCISES PER NAME USING A DEPENDENCIE
-// /api/v1/exercises/exercise/name/:name
 
 // POST ADD EXERCISES TO THE USER PLAN
 // /api/v1/:user/:plan/exercises
@@ -29,6 +26,13 @@ app.use('/api/v1/exercises/', exercises)
 // PUT UPDATE USER PLAN EXERCISE REPS/WEIGHTS
 // /api/v1/:user/:plan/exercises/:id?reps=12
 
+const start = async () => {
+   try {
+      await connectDB(process.env.MONGO_URI)
+      app.listen(port, console.log('server started'))
+   } catch (error) {
+      console.log(error)
+   }
+}
 
-
-app.listen(port)
+start()

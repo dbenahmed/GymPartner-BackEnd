@@ -1,10 +1,19 @@
 const express = require("express")
+const { getExercisesByType, getExercisesByName, getExerciseById } = require("../controllers/exercises")
 
-const exercises = express.Router()
-const backendExercises = require("../data/exercises.json")
-const { getExercisesByType } = require("../controllers/getExercisesByType")
+const router = express.Router()
 
-// GET SEARCH FOR EXERCISES BASED ON 
-// /api/v1/exercises  ?type=hello&name=test
-exercises.get('/', getExercisesByType)
-module.exports = { exercises }
+// GET SEARCH FOR EXERCISES BASED ON TYPE
+// type=hello&name=test
+router.route('/').get(getExercisesByType)
+
+
+// GET EXERCISE INFORMATIONS
+// /exercise/id/:id
+router.route('/exercise/:id').get(getExerciseById)
+
+// GET SEARCH FOR EXERCISES PER NAME USING A DEPENDENCIE
+// /exercise/name/:name
+router.route('/exercise/:name').get(getExercisesByName)
+
+module.exports = { router }
