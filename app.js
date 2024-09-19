@@ -1,8 +1,9 @@
 require("dotenv").config()
 const { connectDB } = require("./db/connect")
 const express = require("express")
-const { router: exercisesRouter } = require("./routes/exercises")
-
+const { router: exercisesRouter } = require("./routes/exercisesRoute")
+const { router: usersRouter } = require("./routes/usersRoute")
+const User = require("./models/users")
 
 const app = express()
 const port = 5000
@@ -12,19 +13,7 @@ const port = 5000
 // /api/v1/exercises
 app.use('/api/v1/exercises/', exercisesRouter)
 
-
-
-// POST ADD EXERCISES TO THE USER PLAN
-// /api/v1/:user/:plan/exercises
-
-// GET RENDER PLAN EXERCISES
-// /api/v1/:user/:plan/exercises
-
-// DELETE REMOVE EXERCISES FROM USER PLAN
-// /api/v1/:user/:plan/exercises
-
-// PUT UPDATE USER PLAN EXERCISE REPS/WEIGHTS
-// /api/v1/:user/:plan/exercises/:id?reps=12
+app.use('/api/v1/users/', usersRouter)
 
 const start = async () => {
    try {

@@ -151,7 +151,10 @@ const userSchema = new mongoose.Schema({
       type: Date,
       default: () => Date.now()
    },
-   plans: [plansSchema]
+   plans: {
+      type: [plansSchema],
+      default: []
+   }
 }, {
    methods: {
       updateUpdatedAt() {
@@ -185,4 +188,4 @@ const userSchema = new mongoose.Schema({
 
 
 
-module.exports = mongoose.model('User', userSchema)
+module.exports = mongoose.model('Users', userSchema)

@@ -147,6 +147,6 @@ const exerciseDataSchema = new mongoose.Schema(
 }
 )
 
-
+exerciseDataSchema.index({name : 'text'})
 
 module.exports = mongoose.model('ExercisesData', exerciseDataSchema)

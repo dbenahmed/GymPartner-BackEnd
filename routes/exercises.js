@@ -13,7 +13,7 @@ router.route('/').get(getExercisesByType)
 router.route('/id/:id').get(getExerciseById)
 
 // GET SEARCH FOR EXERCISES PER NAME USING A DEPENDENCIE
-// /exercise/name/:name
+// /exercise/name/:name?page=2&limit=3
 router.route('/name/:name').get(getExercisesByName)
 
 module.exports = { router } 
