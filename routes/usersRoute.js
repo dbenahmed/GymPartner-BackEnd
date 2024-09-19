@@ -1,22 +1,30 @@
 const express = require("express")
-const { getUserPlanExercises } = require("../controllers/users")
+const {
+   getUserAllPlans,
+   addNewPlanToUsersPlans,
+   addNewExercisesToUserPlan,
+   removeExerciseFromUserPlan,
+   updateUserPlanExerciseData
+} = require("../controllers/users")
 
 
 const router = express.Router()
 
-router.route('/:id').get(getUserPlanExercises)
+// GET USER PLAN EXERCISES
+// /api/v1/users/:userid/:plans
+router.route('/:username/plans').get(getUserAllPlans)
 
+// POST ADD NEW PLAN TO USERS PLANS
+router.route('/plans').post(addNewPlanToUsersPlans)
 
 // POST ADD EXERCISES TO THE USER PLAN
-// /api/v1/:user/:plan/exercises
-
-// GET RENDER PLAN EXERCISES
-// /api/v1/:user/:plan/exercises
+router.route('/plans/exercises').post(addNewExercisesToUserPlan)
 
 // DELETE REMOVE EXERCISES FROM USER PLAN
-// /api/v1/:user/:plan/exercises
+router.route('/plans/exercises').delete(removeExerciseFromUserPlan)
 
 // PUT UPDATE USER PLAN EXERCISE REPS/WEIGHTS
+router.route('/plans/exercises').patch(updateUserPlanExerciseData)
 // /api/v1/:user/:plan/exercises/:id?reps=12
 
 

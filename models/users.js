@@ -10,7 +10,14 @@ const exercisesSchema = new mongoose.Schema({
       type: Number,
       required: true
    },
-   sets: Number,
+   unit: {
+      type: String,
+      required: true,
+      default: 'kg'
+   },
+   sets: {
+      type: Number,
+   },
    currentReps: {
       type: {
          reps: {
@@ -37,6 +44,23 @@ const exercisesSchema = new mongoose.Schema({
       ],
       default: []
    }
+}, {
+   methods: {
+      setNewData(newWeight, newReps, newUnit, archive) {
+         if (!archive) {
+            this.weight = newWeight
+            this.currentReps.reps = newReps
+            this.currentReps.addedAt = new Date(Date.now())
+            this.unit = newUnit
+         } else {
+            this.previousReps.push(this.currentReps)
+            this.weight = newWeight
+            this.currentReps.reps = newReps
+            this.currentReps.addedAt = new Date(Date.now())
+            this.unit = newUnit
+         }
+      },
+   }
 })
 
 const plansSchema = new mongoose.Schema({
@@ -54,13 +78,14 @@ const plansSchema = new mongoose.Schema({
    },
 }, {
    methods: {
-      addExercise(databaseId, weight, reps) {
+      addExercise(databaseId, weight, reps, unit) {
          // Looking for the exo if it exists the archived exos before adding it
          const index = this.archivedExercises.findIndex((val) => val.databaseId === databaseId)
          if (index === -1) {
             this.exercises.push({
                databaseId,
                weight,
+               unit,
                sets: reps.length,
                currentReps: {
                   reps,

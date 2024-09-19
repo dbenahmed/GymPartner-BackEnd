@@ -8,6 +8,7 @@ const User = require("./models/users")
 const app = express()
 const port = 5000
 
+app.use(express.json())
 // ROUTES
 
 // /api/v1/exercises
