@@ -3,12 +3,15 @@
   "version": "1.0.0",
   "main": "app.js",
   "scripts": {
-    "start": "nodemon app.js"
+    "start": "nodemon app.js",
+    "test": "nodemon test.js",
+    "testnode": "node --inspect test.js"
   },
   "author": "",
   "license": "ISC",
   "description": "",
   "devDependencies": {
+    "@types/mongoose": "^5.11.97",
     "nodemon": "^3.1.4"
   },
   "dependencies": {

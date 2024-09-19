@@ -10,10 +10,10 @@ router.route('/').get(getExercisesByType)
 
 // GET EXERCISE INFORMATIONS
 // /exercise/id/:id
-router.route('/exercise/:id').get(getExerciseById)
+router.route('/id/:id').get(getExerciseById)
 
 // GET SEARCH FOR EXERCISES PER NAME USING A DEPENDENCIE
 // /exercise/name/:name
-router.route('/exercise/:name').get(getExercisesByName)
+router.route('/name/:name').get(getExercisesByName)
 
-module.exports = { router }
+module.exports = { router } 
