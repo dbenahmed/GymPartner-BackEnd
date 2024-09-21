@@ -3,7 +3,6 @@
       "titleBar.activeBackground": "#f9e64f",
       "titleBar.inactiveBackground": "#f9e64f99",
       "sash.hoverBorder": "#fbed80",
-      "tab.activeBorder": "#fbed80",
       "commandCenter.border": "#15202b99",
       "titleBar.activeForeground": "#15202b",
       "titleBar.inactiveForeground": "#15202b99"

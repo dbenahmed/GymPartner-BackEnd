@@ -1,6 +1,6 @@
 const express = require("express")
 const {
-   getUserAllPlans,
+   getUserAllPlansAndExercises,
    addNewPlanToUsersPlans,
    addNewExercisesToUserPlan,
    removeExerciseFromUserPlan,
@@ -12,7 +12,7 @@ const router = express.Router()
 
 // GET USER PLAN EXERCISES
 // /api/v1/users/:userid/:plans
-router.route('/:username/plans').get(getUserAllPlans)
+router.route('/:id/plans').get(getUserAllPlansAndExercises)
 
 // POST ADD NEW PLAN TO USERS PLANS
 router.route('/plans').post(addNewPlanToUsersPlans)

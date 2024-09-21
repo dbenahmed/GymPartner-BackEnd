@@ -4,10 +4,10 @@ const Users = require("../models/users")
 
 
 // GET USER PLANS EXERCISES
-const getUserAllPlans = async (req, res) => {
+const getUserAllPlansAndExercises = async (req, res) => {
    try {
-      const { username } = req.params
-      const user = await Users.findOne({ "username": username })
+      const { id } = req.params
+      const user = await Users.findById(id)
       if (!user) {
          res.json({
             succes: false,
@@ -18,11 +18,22 @@ const getUserAllPlans = async (req, res) => {
       const exercisesResponse = user.plans.map(plan => {
          return {
             "name": plan.name,
-            "exercises": plan.exercises
+            "planId": plan._id.toString(),
+            "exercises": plan.exercises.map(exercise => {
+               return {
+                  "databaseId": exercise.databaseId,
+                  "weight": exercise.weight,
+                  "unit": exercise.unit,
+                  "sets": exercise.sets,
+                  "currentReps": exercise.currentReps,
+                  "previousReps": exercise.previousReps,
+                  "id": exercise._id.toString()
+               }
+            })
          }
       })
       res.json({
-         sucess: true,
+         success: true,
          response: exercisesResponse
       })
    }
@@ -167,4 +178,4 @@ const updateUserPlanExerciseData = async (req, res) => {
    }
 }
 
-module.exports = { getUserAllPlans, addNewPlanToUsersPlans, addNewExercisesToUserPlan, removeExerciseFromUserPlan, updateUserPlanExerciseData }
+module.exports = { getUserAllPlansAndExercises, addNewPlanToUsersPlans, addNewExercisesToUserPlan, removeExerciseFromUserPlan, updateUserPlanExerciseData }

@@ -3,17 +3,17 @@ const ExercisesData = require("../models/exercisesData");
 
 // Get exercises data using query parameters from the requeted url
 const getExercisesByType = async (req, res) => {
-   const limit = parseInt(req.query.limit) || 10
-   const page = parseInt(req.query.page) || 1
    try {
+      const limit = parseInt(req.query.limit) || 10
+      const page = parseInt(req.query.page) || 1
       const searchParams = req.query;
       const searchParametersArray = Object.entries(searchParams)
-      console.log(searchParams);
+      console.log(searchParametersArray);
       if (searchParametersArray.length !== 0) {
-         const foundExercises = await ExercisesData.find({ ...searchParams }).skip(limit * page).limit(limit)
+         const foundExercises = await ExercisesData.find({ ...searchParams }).skip(limit * (page - 1)).limit(limit)
          res.json({
             success: true,
-            response: foundExercises,
+            response: foundExercises
          }).status(200)
       } else {
          throw ('No Search Parameters Given')
