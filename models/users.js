@@ -122,7 +122,15 @@ const userSchema = new mongoose.Schema({
       default: () => Date.now()
    },
    collections: {
-      type: [String],
+      type: [
+         {
+            name: {
+               type: String,
+               required: true
+            },
+            plansIds: [String]
+         }
+      ],
       default: []
    },
    exercises: {
