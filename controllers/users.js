@@ -1,8 +1,6 @@
 const Users = require("../models/users")
 
 
-
-
 // GET USER PLANS EXERCISES
 const getUserAllPlansAndExercises = async (req, res) => {
    try {
