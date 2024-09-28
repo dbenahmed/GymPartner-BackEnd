@@ -1,4 +1,5 @@
-const mongoose = require('mongoose')
+const mongoose = require("mongoose")
+const {compareWeights} = require("../utils/compareWeights")
 
 const exercisePlansSchema = new mongoose.Schema({
     planId: {
@@ -25,13 +26,33 @@ const exercisePlansSchema = new mongoose.Schema({
 }, {
     methods: {}
 })
+
+
 const exerciseCollectionSchema = new mongoose.Schema({
-    collectionId: {type: String, required: true}, plans: {
-        type: [exercisePlansSchema], required: true
+    collectionId: {type: String, required: true},
+    plans: {
+        type: [exercisePlansSchema], required: true, default: []
     },
 }, {
-    methods: {}
+    methods: {
+        getPlan(planId) {
+            const foundPlan = this.plans.find(v => v.planId === planId)
+            console.log(foundPlan)
+            if (!foundPlan) {
+                return {
+                    success: false,
+                    response: 'plan not found in this exercise collection'
+                }
+            }
+            return {
+                success: true,
+                response: foundPlan
+            }
+        }
+    }
 })
+
+
 const exerciseSchema = new mongoose.Schema({
     databaseId: {
         type: String, required: true
@@ -59,14 +80,66 @@ const exerciseSchema = new mongoose.Schema({
         }
     }, archived: {
         type: Boolean, default: false
-    }, PR: {
-        type: Number, default: 0
+    }, pr: {
+        type: {
+            weight: {type: Number, default: 0},
+            unit: {type: String, default: 'kg'}
+        }
+
     }
 }, {
     methods: {
         checkIfArchived() {
             return this.archived
-        }, // TODO : UPDATE THIS EXERCISE FUNCTION AFTER UPDATING EACH EXERCISE METHODS
+        }, getCollection(collectionId) {
+            const collection = this.collections.find(v => v.collectionId === collectionId)
+            if (!collection) {
+                return {
+                    success: false
+                }
+            }
+            return {
+                success: true,
+                response: collection
+            }
+        }, addToExerciseCollectionAndPlan(collectionId, planId, weight, unit, reps) {
+            const foundCollection = this.getCollection(collectionId)
+            if (!foundCollection.success) {
+                this.collections.push({
+                    collectionId,
+                    plans: [{
+                        planId,
+                        data: {
+                            weight, sets: reps.length, unit, currentReps: {reps}
+                        }
+                    }]
+                })
+                return {
+                    success: true,
+                }
+            } else {
+                const collection = foundCollection.response
+                console.log('colleciton', collection)
+                const foundPlan = collection.getPlan(planId)
+                if (!foundPlan.success) {
+                    collection.plans.push({
+                        planId,
+                        data: {
+                            weight, sets: reps.length, unit, currentReps: {reps}
+                        }
+                    })
+                    return {
+                        success: true
+                    }
+                } else {
+                    return {
+                        success: false,
+                        response: 'Exercise Already Exists'
+                    }
+                }
+
+            }
+        }
     }
 })
 
@@ -128,9 +201,16 @@ const collectionSchema = new mongoose.Schema({
                 success: true
             }
         }, createNewPlan(planName) {
-            this.plans.push({
-                planName
-            })
+            const planExist = this.plans.find(v => v.planName === planName)
+            if (planExist) {
+                this.plans.push({
+                    planName: `${planName}-Other`
+                })
+            } else {
+                this.plans.push({
+                    planName: `${planName}`
+                })
+            }
             return {
                 success: true
             }
@@ -196,11 +276,21 @@ const userSchema = new mongoose.Schema({
             this.password = newPassword
             // @ts-ignore
             this.updateUpdatedAt()
-        }, addCollection(name) {
-            this.collections.push({
-                name: name
-            })
+        }, createNewCollection(name) {
+            const collectionExists = this.collections.find(v => v.name === name)
+            if (collectionExists) {
+                this.collections.push({
+                    name: `${name}-Other`
+                })
+            } else {
+                this.collections.push({
+                    name: name
+                })
+            }
             this.updateUpdatedAt()
+            return {
+                success: true
+            }
         }, getCollection(collectionId) {
             const index = this.collections.findIndex(v => v._id.toString() === collectionId)
             if (index !== -1) {
@@ -221,15 +311,23 @@ const userSchema = new mongoose.Schema({
                 return {success: false, response: foundCollection.response}
             }
             const collection = foundCollection.response
-            const foundPlan = collection.getPlan('testplan')
+            const foundPlan = collection.getPlan(planId)
             if (!foundPlan.success) {
                 return {
                     success: false, response: foundPlan.response
                 }
             }
+            const plan = foundPlan.response
             // if exercise is not found
             // add it with the new values and add the planID and collectionID
             if (!exercise) {
+                const addedToPlan = plan.addExerciseToPlan(databaseId)
+                if (!addedToPlan) {
+                    return {
+                        success: false,
+                        response: addedToPlan.response
+                    }
+                }
                 this.exercises.push({
                     databaseId, collections: [{
                         collectionId, plans: [{
@@ -239,32 +337,147 @@ const userSchema = new mongoose.Schema({
                                 }
                             }
                         }]
-                    }]
+                    }], maxWeightAndSets: {
+                        weight, unit, reps
+                    },
+                    pr: {
+                        weight: weight,
+                        unit: unit
+                    }
                 })
+                // update plan
+                return {
+                    success: true
+                }
             } else {
                 // Exercise already exists before
-                /*if (exercise.checkIfArchived()) {
-                    const foundCollection = exercise.collections.getCollection(collectionId)
-                    if (foundCollection.success) {
-                        const collection = foundCollection.response
-                        const foundPlan = collection.getPlan()
-                    }
+                if (exercise.checkIfArchived()) {
                     // >>> ? exercise is archived
                     // NOTE THAT archived means exercise don't exist in any plan
                     // if user want selected reps and weights
                     // or last weights are worse than selected weights >
-                    if (yesUseSelectedWeights || exercise.maxWeightAndSets.weight < weight || (exercise.maxWeightAndSets.weight === weight && exercise.maxWeightAndSets.reps[0] < reps[0])) {
+                    if (yesUseSelectedWeights || (compareWeights(exercise.maxWeightAndSets.weight, weight, exercise.maxWeightAndSets.unit, unit) === 's') || ((compareWeights(exercise.maxWeightAndSets.weight, weight, exercise.maxWeightAndSets.unit, unit) === 'e') && exercise.maxWeightAndSets.reps[0] < reps[0])) {
                         // add the exercise with selected weight
+                        const addedToExerciseColAndPlan = exercise.addToExerciseCollectionAndPlan(collectionId, planId, weight, reps, reps)
+                        if (!addedToExerciseColAndPlan.succes) {
+                            return {
+                                success: false,
+                                response: 'ERROR FAILED TO addToExerciseCollectionAndPlan'
+                            }
+                        }
+                        // update max weight
+                        if (compareWeights(weight, exercise.maxWeightAndSets.weight, unit, exercise.maxWeightAndSets.unit) === 'g') {
+                            exercise.maxWeightAndSets.weight = weight
+                            exercise.maxWeightAndSets.reps = reps
+                            exercise.maxWeightAndSets.unit = unit
+                        } else if ((compareWeights(weight, exercise.maxWeightAndSets.weight, unit, exercise.maxWeightAndSets.unit) === 'e') && reps[0] > exercise.maxWeightAndSets.reps[0]) {
+                            exercise.maxWeightAndSets.reps = reps
+                            exercise.maxWeightAndSets.unit = unit
+                        }
+                        // update plan
+                        const addedToPlan = plan.addExerciseToPlan(databaseId)
+                        if (!addedToPlan) {
+                            return {
+                                success: false,
+                                response: addedToPlan.response
+                            }
+                        }
+                        // update archived
+                        exercise.archived = false
+                        // update PR
+                        if (compareWeights(weight, exercise.pr.weight, unit, exercise.pr.unit) === 'g') {
+                            exercise.pr.weight = weight
+                            exercise.pr.unit = unit
+                        }
+                        return {
+                            success: true
+                        }
                     } else {
                         // add exercise with best weights
+                        if ((compareWeights(weight, exercise.maxWeightAndSets.weight, unit, exercise.maxWeightAndSets.unit) === 'g') || ((compareWeights(weight, exercise.maxWeightAndSets.weight, unit, exercise.maxWeightAndSets.unit) === 'e') && reps[0] > exercise.maxWeightAndSets.reps[0])) {
+                            // select given weights
+                            // ++ add collection and planID to exercise db
+                            const addedToExerciseColAndPlan = exercise.addToExerciseCollectionAndPlan(collectionId, planId, weight, unit, reps)
+                            if (!addedToExerciseColAndPlan) {
+                                return {
+                                    success: false,
+                                    response: addedToExerciseColAndPlan.response
+                                }
+                            }
+                        } else {
+                            // select max weights
+                            const maxWeight = exercise.maxWeightAndSets.weight
+                            const maxReps = exercise.maxWeightAndSets.reps
+                            const maxUnit = exercise.maxWeightAndSets.unit
+                            // ++ add collection and planID to exercise db
+                            const addedToExerciseColAndPlan = exercise.addToExerciseCollectionAndPlan(collectionId, planId, maxWeight, maxUnit, maxReps)
+                            if (!addedToExerciseColAndPlan) {
+                                return {
+                                    success: false,
+                                    response: addedToExerciseColAndPlan.response
+                                }
+                            }
+                        }
+                        // update user Plan
+                        const addedToPlan = plan.addExerciseToPlan(databaseId)
+                        if (!addedToPlan) {
+                            return {
+                                success: false,
+                                response: addedToPlan.response
+                            }
+                        }
+
+                        // update archived
+                        exercise.archived = false
+                        // update PR
+                        if (compareWeights(exercise.maxWeightAndSets.weight, exercise.pr.weight, exercise.maxWeightAndSets.unit, exercise.pr.unit) === 'g') {
+                            exercise.pr.weight = exercise.maxWeightAndSets.weight
+                            exercise.pr.unit = exercise.maxWeightAndSets.unit
+                        }
+                        return {
+                            success: true
+                        }
                     }
-                    // ++ add collection and planID to exercise db
+
                 } else {
                     // >>> ? exercise is not archived
-                    // add the selected reps and weights
+                    // add the exercise with selected weight
                     // ++ add collection and planID to exercise db
-
-                }*/
+                    const addedToExerciseColAndPlan = exercise.addToExerciseCollectionAndPlan(collectionId, planId, weight, reps, reps)
+                    if (!addedToExerciseColAndPlan.succes) {
+                        return {
+                            success: false,
+                            response: addedToExerciseColAndPlan.response
+                        }
+                    }
+                    // update max weight
+                    if (compareWeights(weight, exercise.maxWeightAndSets.weight, unit, exercise.maxWeightAndSets.unit) === 'g') {
+                        exercise.maxWeightAndSets.weight = weight
+                        exercise.maxWeightAndSets.reps = reps
+                        exercise.maxWeightAndSets.unit = unit
+                    } else if ((compareWeights(weight, exercise.maxWeightAndSets.weight, unit, exercise.maxWeightAndSets.unit) === 'e') && reps[0] > exercise.maxWeightAndSets.reps[0]) {
+                        exercise.maxWeightAndSets.reps = reps
+                        exercise.maxWeightAndSets.unit = unit
+                    }
+                    // update plan
+                    const addedToPlan = plan.addExerciseToPlan(databaseId)
+                    if (!addedToPlan) {
+                        return {
+                            success: false,
+                            response: addedToPlan.response
+                        }
+                    }
+                    // update archived
+                    exercise.archived = false
+                    // update PR
+                    if (compareWeights(weight, exercise.pr.weight, unit, exercise.pr.unit) === 'g') {
+                        exercise.pr.weight = weight
+                        exercise.pr.unit = unit
+                    }
+                    return {
+                        success: true
+                    }
+                }
             }
         }
     }
