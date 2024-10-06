@@ -1,179 +1,165 @@
 const Users = require("../models/users")
-
+const ExercisesData = require("../models/exercisesData")
 
 // GET USER PLANS EXERCISES
-const getUserAllPlansAndExercises = async (req, res) => {
-   try {
-      const { id } = req.params
-      const user = await Users.findById(id)
-      if (!user) {
-         res.json({
-            succes: false,
-            response: 'User not found'
-         }).status(404)
-         return
-      }
-      const exercisesResponse = user.plans.map(plan => {
-         return {
-            "name": plan.name,
-            "planId": plan._id.toString(),
-            "exercises": plan.exercises.map(exercise => {
-               return {
-                  "databaseId": exercise.databaseId,
-                  "weight": exercise.weight,
-                  "unit": exercise.unit,
-                  "sets": exercise.sets,
-                  "currentReps": exercise.currentReps,
-                  "previousReps": exercise.previousReps,
-                  "id": exercise._id.toString()
-               }
-            })
-         }
-      })
-      res.json({
-         success: true,
-         response: exercisesResponse
-      })
-   }
-   catch (e) {
-      res.json({
-         success: false,
-         response: e
-      }).status(404)
-   }
+const getCollectionsAndPlansNames = async (req, res) => {
+    try {
+        const { userId } = req.params
+        const user = await Users.findById(userId)
+        const collections = user.collections
+        res.json({
+            success: true,
+            response: collections
+        }).status(202)
+    } catch
+    (e) {
+        res.json({
+            success: false,
+            response: e
+        }).status(404)
+    }
 }
 
-// POST ADD NEW PLAN TO USERS PLANS
-const addNewPlanToUsersPlans = async (req, res) => {
-   try {
-      const { id } = req.params
-      const { name } = req.body
-      const user = await Users.findById(id)
-      if (!user) {
-         res.json({
-            success: false,
-            response: 'User not found'
-         }).status(404)
-         return
-      }
-      user.plans.push({
-         "name": name
-      })
-      user.save()
-      res.json({
-         succes: true,
-         response: 'Added new plan to the user successfully'
-      }).status(201)
-   }
-   catch (e) {
-      res.json({
-         success: false,
-         response: e
-      }).status(404)
-   }
-}
+const getExercisesOfPlan = async (req, res) => {
+    try {
+        const { userId, collectionId, planId } = req.body
+        const user = await Users.findById(userId)
+        const foundCollection = await user.getCollection(collectionId)
+        if (!foundCollection.success) {
+            res.json({
+                success: false,
+                response: 'Collection Not Found'
+            }).status(404)
+            return
+        }
+        const collection = foundCollection.response
+        const foundPlan = await collection.getPlan(planId)
+        if (!foundPlan.success) {
+            res.json({
+                success: false,
+                response: 'Plan Not Found'
+            }).status(404)
+            return
+        }
+        const plan = foundPlan.response
+        const exercises = plan.planExercises
 
-// POST ADD EXERCISES TO THE USER PLAN
-const addNewExercisesToUserPlan = async (req, res) => {
-   try {
-      const { databaseId, weight, reps, unit, planId, userId } = req.body
-      const user = await Users.findById(userId)
-      if (!user) {
-         res.json({
-            success: false,
-            response: 'User not found'
-         }).status(404)
-         return
-      }
-      const plan = user.plans.find(v => v._id.toString() === planId)
-      if (!plan) {
-         res.json({
-            succes: false,
-            response: 'Plan not found'
-         }).status(404)
-         return
-      }
-      // @ts-ignore
-      await plan.addExercise(databaseId, weight, reps, unit)
-      await user.save()
-      res.json({
-         succes: true,
-         response: 'Added exercise to plan'
-      }).status(201)
-   } catch (e) {
-      res.json({
-         success: false,
-         response: e
-      }).status(404)
-   }
-}
-// DELETE REMOVE EXERCISES FROM USER PLAN
-const removeExerciseFromUserPlan = async (req, res) => {
-   try {
-      const { exerciseId, planId, userId } = req.body
-      const user = await Users.findById(userId)
-      if (user) {
-         const plan = user.plans.find(val => val._id.toString() === planId)
-         if (plan) {
-            const exerciseIndex = plan.exercises.findIndex(val => val._id.toString() === exerciseId)
-            if (exerciseIndex !== -1) {
-               plan.exercises.splice(exerciseIndex, 1)
-               res.json({
-                  success: true,
-                  response: 'Exercise deleted successfully'
-               }).status(201)
+        const exercisesDataResponse = await Promise.all(exercises.map(async (databaseId) => {
+            const exerciseData = await ExercisesData.findById(databaseId)
+            const name = exerciseData.name
+            const foundExercise = user.exercises.find(v => v.databaseId === databaseId)
+            const foundCollection = foundExercise.getCollection(collectionId)
+            if (!foundCollection.success) {
+                res.json({
+                    success: false,
+                    response: 'Collection Not Found'
+                }).status(404)
+                return
             }
-         }
-      }
-   } catch (error) {
-      res.json({
-         success: false,
-         response: error
-      })
-   }
+            const collection = foundCollection.response
+            const foundPlan = collection.getPlan(planId)
+            if (!foundPlan.success) {
+                res.json({
+                    success: false,
+                    response: 'Plan Not Found'
+                }).status(404)
+                return
+            }
+            const plan = foundPlan.response
+            const data = plan.data
+            return {
+                databaseId,
+                name,
+                data: plan.data
+            }
+        }))
+        res.json({
+            success: true,
+            response: exercisesDataResponse
+        }).status(202)
+    } catch (e) {
+        res.json({
+            success: false,
+            response: e
+        }).status(404)
+    }
 }
 
-// PUT UPDATE USER PLAN EXERCISE REPS/WEIGHTS
-const updateUserPlanExerciseData = async (req, res) => {
-   try {
-      const { userId, planId, exerciseId, weight, reps, unit, archive } = req.body
-      const user = await Users.findById(userId)
-      if (!user) {
-         res.json({
-            succes: false,
-            response: 'User not found'
-         }).status(404)
-         return
-      }
-      const plan = user.plans.find(v => v._id.toString() === planId)
-      if (!plan) {
-         res.json({
-            success: false,
-            response: 'Plan not found'
-         }).status(404)
-         return
-      }
-      const exercise = plan.exercises.find(v => v._id.toString() === exerciseId)
-      if (!exercise) {
-         res.json({
-            success: false,
-            response: 'Exercise not found'
-         }).status(404)
-         return
-      }
-      // @ts-ignore
-      exercise.setNewData(weight, reps, unit, archive)
-      user.save()
-      res.json({
-         succes: true,
-         response: 'Exercise updated successfully'
-      })
-   } catch (error) {
-      res.json({
-         success: false,
-         response: error
-      })
-   }
+const createNewCollectionToUser = async (req, res) => {
+    try {
+        const {
+            userId,
+            collectionName
+        } = req.body
+        const user = await Users.findById(userId)
+        const createdNewCollection = user.createNewCollection(collectionName)
+        if (!createdNewCollection.success) {
+            res.json({
+                success: false,
+                response: createdNewCollection.response
+            }).status(404)
+        }
+        res.json({
+            success: true
+        }).status(202)
+    } catch (e) {
+        res.json({ success: false, response: e })
+    }
 }
 
-module.exports = { getUserAllPlansAndExercises, addNewPlanToUsersPlans, addNewExercisesToUserPlan, removeExerciseFromUserPlan, updateUserPlanExerciseData }
+const updateCollectionName = async (req, res) => {
+    try {
+        const {
+            userId,
+            collectionId,
+            newCollectionName
+        } = req.body
+        const user = await Users.findById(userId)
+        const foundCollection = user.getCollection(collectionId)
+        if (!foundCollection.success) {
+            res.json({
+                success: false,
+                response: 'Collection Not Found'
+            }).status(404)
+        }
+        const collection = foundCollection.response
+        collection.name = newCollectionName
+        res.json({
+            success: true
+        }).status(202)
+    } catch (e) {
+        res.json({
+            success: false,
+            response: e
+        }).status(404)
+    }
+}
+
+
+const deleteWholeCollection = async (req, res) => {
+    try {
+        const {
+            userId,
+            collectionId
+        } = req.body
+        const user = await Users.findById(userId)
+        const deletedCollection = user.deleteWholeCollection(collectionId)
+        if (!deletedCollection.success) {
+            res.json({
+                success: false,
+                response: deletedCollection.response
+            }).status(404)
+        }
+        console.log(user)
+        res.json({
+            success: true
+        }).status(202)
+    } catch (e) {
+        res.json({
+            success: false,
+            response: e
+        }).status(404)
+    }
+}
+
+module.exports = { getCollectionsAndPlansNames, getExercisesOfPlan, createNewCollectionToUser, updateCollectionName, deleteWholeCollection }

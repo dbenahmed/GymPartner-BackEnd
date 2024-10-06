@@ -1,5 +1,5 @@
 const mongoose = require("mongoose")
-const {compareWeights} = require("../utils/compareWeights")
+const { compareWeights } = require("../utils/compareWeights")
 
 const exercisePlansSchema = new mongoose.Schema({
     planId: {
@@ -29,7 +29,7 @@ const exercisePlansSchema = new mongoose.Schema({
 
 
 const exerciseCollectionSchema = new mongoose.Schema({
-    collectionId: {type: String, required: true},
+    collectionId: { type: String, required: true },
     plans: {
         type: [exercisePlansSchema], required: true, default: []
     },
@@ -37,7 +37,6 @@ const exerciseCollectionSchema = new mongoose.Schema({
     methods: {
         getPlan(planId) {
             const foundPlan = this.plans.find(v => v.planId === planId)
-            console.log(foundPlan)
             if (!foundPlan) {
                 return {
                     success: false,
@@ -82,8 +81,8 @@ const exerciseSchema = new mongoose.Schema({
         type: Boolean, default: false
     }, pr: {
         type: {
-            weight: {type: Number, default: 0},
-            unit: {type: String, default: 'kg'}
+            weight: { type: Number, default: 0 },
+            unit: { type: String, default: 'kg' }
         }
 
     }
@@ -110,7 +109,7 @@ const exerciseSchema = new mongoose.Schema({
                     plans: [{
                         planId,
                         data: {
-                            weight, sets: reps.length, unit, currentReps: {reps}
+                            weight, sets: reps.length, unit, currentReps: { reps }
                         }
                     }]
                 })
@@ -119,13 +118,12 @@ const exerciseSchema = new mongoose.Schema({
                 }
             } else {
                 const collection = foundCollection.response
-                console.log('colleciton', collection)
                 const foundPlan = collection.getPlan(planId)
                 if (!foundPlan.success) {
                     collection.plans.push({
                         planId,
                         data: {
-                            weight, sets: reps.length, unit, currentReps: {reps}
+                            weight, sets: reps.length, unit, currentReps: { reps }
                         }
                     })
                     return {
@@ -160,7 +158,7 @@ const planSchema = new mongoose.Schema({
             }
         }, addExerciseToPlan(databaseId) {
             const index = this.planExercises.findIndex(v => v === databaseId)
-            if (index !== -1) {
+            if (index === -1) {
                 this.planExercises.push(databaseId)
                 return {
                     success: true
@@ -302,13 +300,27 @@ const userSchema = new mongoose.Schema({
                     success: false, response: 'Collection not Found'
                 }
             }
+        },
+        deleteWholeCollection(collectionId) {
+            // finding index of the collections
+            const index = this.collections.findIndex(v => v._id.toString() === collectionId)
+            if (index !== -1) {
+                this.collections.splice(index, 1)
+                return {
+                    success: true
+                }
+            } else {
+                return {
+                    success: false, response: 'Collection not Found'
+                }
+            }
         }, addExercise(databaseId, collectionId, planId, weight, reps, unit, yesUseSelectedWeights) {
             // check whether the exercise exists already in user exercises
             const exercise = this.exercises.find(v => v.databaseId === databaseId)
             // check whether collection exists
             const foundCollection = this.getCollection(collectionId)
             if (!foundCollection.success) {
-                return {success: false, response: foundCollection.response}
+                return { success: false, response: foundCollection.response }
             }
             const collection = foundCollection.response
             const foundPlan = collection.getPlan(planId)
@@ -322,7 +334,7 @@ const userSchema = new mongoose.Schema({
             // add it with the new values and add the planID and collectionID
             if (!exercise) {
                 const addedToPlan = plan.addExerciseToPlan(databaseId)
-                if (!addedToPlan) {
+                if (!addedToPlan.success) {
                     return {
                         success: false,
                         response: addedToPlan.response
@@ -345,7 +357,6 @@ const userSchema = new mongoose.Schema({
                         unit: unit
                     }
                 })
-                // update plan
                 return {
                     success: true
                 }
