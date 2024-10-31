@@ -48,8 +48,8 @@ const getExerciseById = async (req, res) => {
 const getExercisesByName = async (req, res) => {
    try {
       const { name } = req.params
-      const limit = (parseInt(req.query.limit) || 10)
-      const page = (parseInt(req.query.page) || 1)
+      const limit = parseInt(req.query.limit || 10)
+      const page = parseInt(req.query.page - 1 || 0)
       const found = await ExercisesData.aggregate([
          {
             $search: {
@@ -62,14 +62,48 @@ const getExercisesByName = async (req, res) => {
             }
          },
          {
+            $project: {
+               name: 1,
+               primaryMuscles: 1,
+               secondaryMuscles: 1,
+               level: 1,
+               equipment: 1,
+            }
+         },
+         {
             $skip: page * limit
          }, {
             $limit: limit
          }
       ])
+      const allFoundData = await ExercisesData.aggregate([
+         {
+            $search: {
+               index: 'name',
+               text: {
+                  path: 'name',
+                  query: name,
+                  fuzzy: {}
+               }
+            }
+         },
+         {
+            $project: {
+               name: 1,
+            }
+         },
+         {
+            $count: 'count'
+         }
+      ])
+      const count = Math.ceil(allFoundData[0].count / limit)
+      console.log(allFoundData[0].count)
       res.json({
-         succes: true,
-         response: found
+         success: true,
+         response: {
+            count,
+            found
+         }
       }).status(200)
    } catch (e) {
       res.json({

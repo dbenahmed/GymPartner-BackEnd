@@ -22,7 +22,7 @@ const getCollectionsAndPlansNames = async (req, res) => {
 
 const getExercisesOfPlan = async (req, res) => {
     try {
-        const { userId, collectionId, planId } = req.body
+        const { userId, collectionId, planId } = req.params
         const user = await Users.findById(userId)
         const foundCollection = await user.getCollection(collectionId)
         if (!foundCollection.success) {
@@ -43,7 +43,6 @@ const getExercisesOfPlan = async (req, res) => {
         }
         const plan = foundPlan.response
         const exercises = plan.planExercises
-
         const exercisesDataResponse = await Promise.all(exercises.map(async (databaseId) => {
             const exerciseData = await ExercisesData.findById(databaseId)
             const name = exerciseData.name
@@ -67,12 +66,14 @@ const getExercisesOfPlan = async (req, res) => {
             }
             const plan = foundPlan.response
             const data = plan.data
+            console.log('foundExercise')
             return {
                 databaseId,
                 name,
                 data: plan.data
             }
         }))
+        console.log('exercisesDataResponse', exercisesDataResponse)
         res.json({
             success: true,
             response: exercisesDataResponse
@@ -162,4 +163,39 @@ const deleteWholeCollection = async (req, res) => {
     }
 }
 
-module.exports = { getCollectionsAndPlansNames, getExercisesOfPlan, createNewCollectionToUser, updateCollectionName, deleteWholeCollection }
+const addExerciseToUserPlan = async (req, res) => {
+    console.log('tring')
+    try {
+        const {
+            databaseId,
+            collectionId,
+            planId,
+            userId,
+            weight,
+            reps,
+            unit,
+            yesUseSelectedWeights
+        } = req.body
+        const user = await Users.findById(userId)
+        const addedExerciseToUser = user.addExercise(databaseId, collectionId, planId, weight, reps, unit, yesUseSelectedWeights)
+        if (!addedExerciseToUser.success) { throw (addedExerciseToUser.response) }
+        res.json({
+            success: true
+        })
+    } catch (e) {
+        res.json({
+            success: false,
+            response: e
+        }).status(404)
+    }
+}
+
+
+module.exports = {
+    getCollectionsAndPlansNames,
+    getExercisesOfPlan,
+    createNewCollectionToUser,
+    updateCollectionName,
+    deleteWholeCollection,
+    addExerciseToUserPlan
+}

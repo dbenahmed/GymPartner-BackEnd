@@ -11,7 +11,7 @@ const exercisePlansSchema = new mongoose.Schema({
             }, sets: {
                 type: Number, default: 0
             }, unit: {
-                type: String, default: 'kg'
+                type: String
             }, currentReps: {
                 type: {
                     reps: {
@@ -47,6 +47,19 @@ const exerciseCollectionSchema = new mongoose.Schema({
                 success: true,
                 response: foundPlan
             }
+        }, removePlan(planId) {
+            const index = this.plans.findIndex(v => v.planId === planId)
+            if (index === -1) {
+                return {
+                    success: false,
+                    response: 'Plan not found'
+                }
+            } else {
+                this.plans.splice(index, 1)
+                return {
+                    success: true
+                }
+            }
         }
     }
 })
@@ -59,7 +72,12 @@ const exerciseSchema = new mongoose.Schema({
         type: [exerciseCollectionSchema]
     }, previousReps: {
         type: [{
-            reps: [Number], whichCollection: String, whichPlan: String, addedAt: {
+            weight: Number,
+            reps: [Number],
+            unit: String,
+            whichCollection: String,
+            whichPlan: String,
+            addedAt: {
                 type: Date, default: Date.now()
             }
         }], default: []
@@ -82,9 +100,9 @@ const exerciseSchema = new mongoose.Schema({
     }, pr: {
         type: {
             weight: { type: Number, default: 0 },
-            unit: { type: String, default: 'kg' }
+            unit: { type: String, default: 'kg' },
+            reps: { type: [Number], required: true }
         }
-
     }
 }, {
     methods: {
@@ -136,6 +154,58 @@ const exerciseSchema = new mongoose.Schema({
                     }
                 }
 
+            }
+        }, updateExercisePr(newWeight, newReps, newUnit) {
+            const previousWeight = this.pr.weight
+            const previousReps = this.pr.reps
+            const previousUnit = this.pr.unit
+            if (compareWeights(newWeight, previousWeight, newUnit, previousUnit) === 'g') {
+                this.pr.weight = newWeight
+                this.pr.reps = newReps
+                this.pr.unit = newUnit
+            } else if ((compareWeights(newWeight, previousWeight, newUnit, previousUnit) === 'e') && newReps[0] > previousReps[0]) {
+                this.pr.reps = newReps
+                this.pr.unit = newUnit
+            }
+            return {
+                success: true
+            }
+        }, updateExerciseMaxWeightsAndReps(newWeight, newReps, newUnit) {
+            const previousWeight = this.maxWeightAndSets.weight
+            const previousReps = this.maxWeightAndSets.reps
+            const previousUnit = this.maxWeightAndSets.unit
+            if (compareWeights(newWeight, previousWeight, newUnit, previousUnit) === 'g') {
+                this.maxWeightAndSets.weight = newWeight
+                this.maxWeightAndSets.reps = newReps
+                this.maxWeightAndSets.unit = newWeight
+            } else if ((compareWeights(newWeight, previousWeight, newUnit, previousUnit) === 'e') && newReps[0] > previousReps[0]) {
+                this.maxWeightAndSets.reps = newReps
+                this.maxWeightAndSets.unit = newUnit
+            }
+            return {
+                success: true
+            }
+        }, addToPreviousReps(weight, reps, unit, whichCollectionId, whichPlanId,) {
+            this.previousReps.push({
+                weight,
+                reps,
+                unit,
+                whichCollection: whichCollectionId,
+                whichPlan: whichPlanId
+            })
+        },
+        removeCollection(collectionId) {
+            const collectionIndex = this.collections.find(v => v.collectionId === collectionId)
+            if (collectionIndex === -1) {
+                return {
+                    success: false,
+                    response: 'Collection not found'
+                }
+            } else {
+                this.collections.splice(collectionIndex, 1)
+                return {
+                    success: true
+                }
             }
         }
     }
@@ -345,7 +415,7 @@ const userSchema = new mongoose.Schema({
                         collectionId, plans: [{
                             planId, data: {
                                 weight, sets: reps.length, unit, currentReps: {
-                                    reps,
+                                    reps
                                 }
                             }
                         }]
@@ -354,7 +424,8 @@ const userSchema = new mongoose.Schema({
                     },
                     pr: {
                         weight: weight,
-                        unit: unit
+                        unit: unit,
+                        reps: reps
                     }
                 })
                 return {
@@ -370,22 +441,32 @@ const userSchema = new mongoose.Schema({
                     if (yesUseSelectedWeights || (compareWeights(exercise.maxWeightAndSets.weight, weight, exercise.maxWeightAndSets.unit, unit) === 's') || ((compareWeights(exercise.maxWeightAndSets.weight, weight, exercise.maxWeightAndSets.unit, unit) === 'e') && exercise.maxWeightAndSets.reps[0] < reps[0])) {
                         // add the exercise with selected weight
                         const addedToExerciseColAndPlan = exercise.addToExerciseCollectionAndPlan(collectionId, planId, weight, reps, reps)
-                        if (!addedToExerciseColAndPlan.succes) {
+                        if (!addedToExerciseColAndPlan.success) {
                             return {
                                 success: false,
                                 response: 'ERROR FAILED TO addToExerciseCollectionAndPlan'
                             }
                         }
                         // update max weight
-                        if (compareWeights(weight, exercise.maxWeightAndSets.weight, unit, exercise.maxWeightAndSets.unit) === 'g') {
-                            exercise.maxWeightAndSets.weight = weight
-                            exercise.maxWeightAndSets.reps = reps
-                            exercise.maxWeightAndSets.unit = unit
-                        } else if ((compareWeights(weight, exercise.maxWeightAndSets.weight, unit, exercise.maxWeightAndSets.unit) === 'e') && reps[0] > exercise.maxWeightAndSets.reps[0]) {
-                            exercise.maxWeightAndSets.reps = reps
-                            exercise.maxWeightAndSets.unit = unit
+                        const updatedWeight = exercise.updateExerciseMaxWeightsAndReps(weight, reps, unit)
+                        if (!updatedWeight) {
+                            return {
+                                success: false,
+                                response: 'Error updating max weights and reps'
+                            }
                         }
+                        /* 
+                            if (compareWeights(weight, exercise.maxWeightAndSets.weight, unit, exercise.maxWeightAndSets.unit) === 'g') {
+                                exercise.maxWeightAndSets.weight = weight
+                                exercise.maxWeightAndSets.reps = reps
+                                exercise.maxWeightAndSets.unit = unit
+                            } else if ((compareWeights(weight, exercise.maxWeightAndSets.weight, unit, exercise.maxWeightAndSets.unit) === 'e') && reps[0] > exercise.maxWeightAndSets.reps[0]) {
+                                exercise.maxWeightAndSets.reps = reps
+                                exercise.maxWeightAndSets.unit = unit
+                            }
+                                */
                         // update plan
+
                         const addedToPlan = plan.addExerciseToPlan(databaseId)
                         if (!addedToPlan) {
                             return {
@@ -396,10 +477,21 @@ const userSchema = new mongoose.Schema({
                         // update archived
                         exercise.archived = false
                         // update PR
-                        if (compareWeights(weight, exercise.pr.weight, unit, exercise.pr.unit) === 'g') {
+                        const updatedPr = exercise.updateExercisePr(weight, reps, unit)
+                        if (!updatedPr.success) {
+                            return {
+                                success: false,
+                                response: 'failed updating PR'
+                            }
+                        }
+                        /* previous update PR code
+                            if 
+                            (compareWeights(weight, exercise.pr.weight, unit, exercise.pr.unit) === 'g') {
                             exercise.pr.weight = weight
                             exercise.pr.unit = unit
-                        }
+                            } 
+                        */
+
                         return {
                             success: true
                         }
@@ -429,6 +521,7 @@ const userSchema = new mongoose.Schema({
                                 }
                             }
                         }
+
                         // update user Plan
                         const addedToPlan = plan.addExerciseToPlan(databaseId)
                         if (!addedToPlan) {
@@ -441,35 +534,56 @@ const userSchema = new mongoose.Schema({
                         // update archived
                         exercise.archived = false
                         // update PR
-                        if (compareWeights(exercise.maxWeightAndSets.weight, exercise.pr.weight, exercise.maxWeightAndSets.unit, exercise.pr.unit) === 'g') {
-                            exercise.pr.weight = exercise.maxWeightAndSets.weight
-                            exercise.pr.unit = exercise.maxWeightAndSets.unit
+                        const updatedPr = exercise.updateExercisePr(exercise.maxWeightAndSets.weight, exercise.maxWeightAndSets.reps, exercise.maxWeightAndSets.unit)
+                        if (!updatedPr.success) {
+                            return {
+                                success: false,
+                                response: 'failed updating PR'
+                            }
                         }
-                        return {
-                            success: true
-                        }
+
+                        /* 
+                                if (compareWeights(exercise.maxWeightAndSets.weight, exercise.pr.weight, exercise.maxWeightAndSets.unit, exercise.pr.unit) === 'g') {
+                                exercise.pr.weight = exercise.maxWeightAndSets.weight
+                                exercise.pr.unit = exercise.maxWeightAndSets.unit
+                            }
+                            return {
+                                success: true
+                            } 
+                         */
                     }
 
                 } else {
                     // >>> ? exercise is not archived
                     // add the exercise with selected weight
                     // ++ add collection and planID to exercise db
-                    const addedToExerciseColAndPlan = exercise.addToExerciseCollectionAndPlan(collectionId, planId, weight, reps, reps)
-                    if (!addedToExerciseColAndPlan.succes) {
+                    const addedToExerciseColAndPlan = exercise.addToExerciseCollectionAndPlan(collectionId, planId, weight, unit, reps)
+                    if (!addedToExerciseColAndPlan.success) {
                         return {
                             success: false,
                             response: addedToExerciseColAndPlan.response
                         }
                     }
                     // update max weight
-                    if (compareWeights(weight, exercise.maxWeightAndSets.weight, unit, exercise.maxWeightAndSets.unit) === 'g') {
-                        exercise.maxWeightAndSets.weight = weight
-                        exercise.maxWeightAndSets.reps = reps
-                        exercise.maxWeightAndSets.unit = unit
-                    } else if ((compareWeights(weight, exercise.maxWeightAndSets.weight, unit, exercise.maxWeightAndSets.unit) === 'e') && reps[0] > exercise.maxWeightAndSets.reps[0]) {
-                        exercise.maxWeightAndSets.reps = reps
-                        exercise.maxWeightAndSets.unit = unit
+                    const updatedWeight = exercise.updateExerciseMaxWeightsAndReps(weight, reps, unit)
+                    if (!updatedWeight) {
+                        return {
+                            success: false,
+                            response: 'Error updating max weights and reps'
+                        }
                     }
+
+                    /*
+                    Previous Update max weights and reps code ( not needed now )
+                        if (compareWeights(weight, exercise.maxWeightAndSets.weight, unit, exercise.maxWeightAndSets.unit) === 'g') {
+                            exercise.maxWeightAndSets.weight = weight
+                            exercise.maxWeightAndSets.reps = reps
+                            exercise.maxWeightAndSets.unit = unit
+                        } else if ((compareWeights(weight, exercise.maxWeightAndSets.weight, unit, exercise.maxWeightAndSets.unit) === 'e') && reps[0] > exercise.maxWeightAndSets.reps[0]) {
+                            exercise.maxWeightAndSets.reps = reps
+                            exercise.maxWeightAndSets.unit = unit
+                        } 
+                    */
                     // update plan
                     const addedToPlan = plan.addExerciseToPlan(databaseId)
                     if (!addedToPlan) {
@@ -478,16 +592,115 @@ const userSchema = new mongoose.Schema({
                             response: addedToPlan.response
                         }
                     }
+
                     // update archived
                     exercise.archived = false
                     // update PR
-                    if (compareWeights(weight, exercise.pr.weight, unit, exercise.pr.unit) === 'g') {
+                    const updatedPr = exercise.updateExercisePr(weight, reps, unit)
+                    if (!updatedPr.success) {
+                        return {
+                            success: false,
+                            response: 'failed updating PR'
+                        }
+                    }
+                    /* 
+                        previous update PR code (not needed)
+                        if (compareWeights(weight, exercise.pr.weight, unit, exercise.pr.unit) === 'g') {
                         exercise.pr.weight = weight
                         exercise.pr.unit = unit
-                    }
+                        } 
+                    */
+
                     return {
                         success: true
                     }
+                }
+            }
+        }, removeExercise(exerciseDatabaseId, collectionId, planId, yesUpdateMaxWeightAndPr, yesArchive) {
+            const index = this.exercises.findIndex(v => v.databaseId === exerciseDatabaseId)
+            if (index === -1) {
+                // exercise not found
+                return {
+                    success: false,
+                    response: 'Exercise not found'
+                }
+            }
+            const exercise = this.exercises[index]
+            const foundCollection = exercise.getCollection(collectionId)
+            if (!foundCollection.success) {
+                return {
+                    success: false,
+                    response: 'Collection Inside Exercise Was Not Found'
+                }
+            }
+            const collection = foundCollection.response
+            // if exercise exists in other plans > there is multiple collections or one collection or multiple plans in this collection
+            // then delete it only from current plan and choose between updating PR and maxWeights
+            const foundPlan = collection.getPlan(planId)
+            if (!foundPlan.success) {
+                return {
+                    success: false,
+                    response: 'Plan was not found'
+                }
+            }
+            const plan = foundPlan.response
+            if (yesUpdateMaxWeightAndPr) {
+                exercise.updateExerciseMaxWeightsAndReps(plan.data.weight, plan.data.currentReps.reps, plan.data.unit)
+                exercise.updateExercisePr(plan.data.weight, plan.data.currentReps.reps, plan.data.unit)
+                exercise.addToPreviousReps(plan.data.weight, plan.data.currentReps.reps, plan.data.unit, collection.collectionId)
+            } else {
+                exercise.addToPreviousReps(plan.data.weight, plan.data.currentReps.reps, plan.data.unit, collection.collectionId)
+            }
+
+            const foundUserCollection = this.getCollection(collectionId)
+            if (!foundUserCollection.success) {
+                return {
+                    success: false,
+                    response: 'User Collection was not found'
+                }
+            }
+            const userCollection = foundUserCollection.response
+            const foundUserCollectionPlan = userCollection.getPlan(planId)
+            if (!foundUserCollectionPlan.success) {
+                return {
+                    success: false,
+                    response: 'User Plan was not found'
+                }
+            }
+            const userCollectionPlan = foundUserCollectionPlan.response
+            const removedExerciseFromUserPlan = userCollectionPlan.removeExerciseFromPlan(exerciseDatabaseId)
+            if (!removedExerciseFromUserPlan.success) {
+                return {
+                    success: false,
+                    response: 'Failed removing exercise from user plan'
+                }
+            }
+
+            const removedPlanFromExerciseData = collection.removePlan(planId)
+            if (!removedPlanFromExerciseData.success) {
+                return {
+                    success: false,
+                    response: 'Failed removing plan from exercise data'
+                }
+            }
+
+            if (exercise.collections.length > 1 || collection.plans.length > 1) {
+                // ! case exercise exist in other plans or collections
+                // remove exercise from plans and collection
+                const removedPlan = collection.removePlan(planId)
+                if (!removedPlan.success) {
+                    return { success: false, response: 'Error removing the plan' }
+                }
+            } else {
+                // ! case exercise dont exist in other plans or collections
+                // if exercise dont exist in other plans > choose between archiving it or deleting it completely
+                if (yesArchive) {
+                    exercise.archived = true
+                } else {
+                    this.exercises.splice(index, 1)
+                }
+                return {
+                    success: true
                 }
             }
         }
